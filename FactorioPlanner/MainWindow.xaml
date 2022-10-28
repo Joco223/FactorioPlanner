@@ -1,0 +1,21 @@
+﻿<Window x:Class="FactorioPlanner.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:FactorioPlanner"
+        mc:Ignorable="d"
+        Title="Factorio Planner" Height="450" Width="800">
+    <Grid>
+        <Menu x:Name="menu" VerticalAlignment="Top">
+            <MenuItem x:Name="fileMenu" Header="File">
+                <MenuItem x:Name="newProjectButton" Header="New project" Click="newProjectButton_Click"/>
+                <MenuItem x:Name="openProjectButton" Header="Open project" Click="openProjectButton_Click"/>
+                <MenuItem x:Name="saveProjectButton" Header="Save project" Click="saveProjectButton_Click"/>
+                <MenuItem x:Name="saveAsProjectButton" Header="Save project as" Click="saveAsProjectButton_Click"/>
+                <MenuItem x:Name="loadDefaultRecipes" Header="Load default recipes" Click="loadDefaultRecipes_Click"/>
+            </MenuItem>
+            <MenuItem x:Name="editMenu" Header="Edit"/>
+        </Menu>
+    </Grid>
+</Window>
