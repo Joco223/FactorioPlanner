@@ -25,10 +25,15 @@ namespace FactorioPlanner {
 
         public MainWindow() {
             InitializeComponent();
+
+            Logger.resetLog();
+            Logger.LogInfo("New untitled project created", "MainWindow");
+            Logger.VerboseLog = true;
         }
 
         private void newProjectButton_Click(object sender, RoutedEventArgs e) {
             mainProject = new Project("Untitled");
+            Logger.LogInfo("New untitled project created", "newProjectButton_click");
         }
 
         private void saveProject() {
@@ -44,7 +49,10 @@ namespace FactorioPlanner {
             if (dialog.ShowDialog() == true) {
                 mainProject.Path = dialog.FileName;
                 mainProject.Name = System.IO.Path.GetFileNameWithoutExtension(dialog.FileName);
-                mainProject.saveProject(dialog.FileName);       
+                mainProject.saveProject(dialog.FileName);
+                Logger.LogInfo("Project saved", "saveProject");
+            } else {
+                Logger.LogInfo("Project save canceled", "saveProject");
             }
         }
 
@@ -66,11 +74,15 @@ namespace FactorioPlanner {
 
             if (dialog.ShowDialog() == true) {
                 mainProject.loadProject(dialog.FileName);
+                Logger.LogInfo("Project loaded", "openProjectButton_Click");
+            } else {
+                Logger.LogInfo("Project load canceled", "openProjectButton_Click");
             }
         }
 
         private void loadDefaultRecipes_Click(object sender, RoutedEventArgs e) {
             mainProject.loadDefaultRecipes();
+            Logger.LogInfo("Default Factorio recipes loaded", "loadDefaultRecipes_Click");
         }
     }
 }

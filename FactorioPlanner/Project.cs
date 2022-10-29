@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Documents;
 using NLua;
@@ -61,7 +62,25 @@ namespace FactorioPlanner {
             File.WriteAllText(path, jsonFile);
         }
 
+        private void convertJsonIngredients(ref DifficultyRecipe r) {
+            r.jsonIngredients ??= new List<JsonElement>();
+            r.ingredients ??= new List<RecipeIngredient>();
+
+            //Converting from jsonIngredients to regular ingredients list because of incosntitent structure
+            foreach (var ing in r.jsonIngredients) {
+                if (ing.ValueKind == JsonValueKind.Array) {
+                    r.ingredients.Add(new RecipeIngredient("item", ing[0].GetString() ?? "", ing[1].GetInt32()));
+                } else {
+                    RecipeIngredient? ingredient = ing.Deserialize<RecipeIngredient>();
+                    if (ingredient != null)
+                        r.ingredients.Add(ingredient);
+                }
+            }
+        }
+
         public void loadDefaultRecipes() {
+
+            //Loading the base recipes file
             string recipesPath = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Factorio\\data\\base\\prototypes\\recipe.lua";
             var recipesFileLines = File.ReadAllLines(recipesPath);
             string recipesText = "";
@@ -73,106 +92,134 @@ namespace FactorioPlanner {
                 } else {
                     if (line != ")") {
                         recipesText += line + "\n";
-                    }   
+                    }
                 }
             }
 
+
+            //Cleaning up and removing the data:expand from the begining of the file
             Lua state = new Lua();
 
+            state.DoString("jsonConv = require \"json\"");
             state.DoString("data = " + recipesText);
             state.DoString("len = #data");
+            state.DoString("dataJson = jsonConv.encode(data)");
+            string dataJson = (string)state["dataJson"];
 
-            int recipesCount = (int)(double)state["len"];
+            //Deserializing into objects
+            List<Recipe>? loadedRecipes = JsonSerializer.Deserialize<List<Recipe>>(dataJson);
 
-            for (int i = 1; i < recipesCount; i++) {           
-                state.DoString("name = data[" + i + "][\"name\"]");      
+            if (loadedRecipes != null) {
+                Logger.LogInfo("Number of loaded recipes: " + loadedRecipes.Count, "loadDefaultRecipes");
 
-                string recipeName = (string)state["name"];
 
-                state.DoString("normal = data[" + i + "][\"normal\"]");
-                LuaTable normal = (LuaTable)state["normal"];
+                //Cleaning up the recipes so all have a consitent structure
+                foreach (Recipe r in loadedRecipes) {
+                    r.resultCount ??= 1;
 
-                if (normal == null) {
-                    List<RecipeIngredient> recipeIngredients = new List<RecipeIngredient>();
+                    if (r.resultCount == 0) r.resultCount = 1;
+                    
+                    //If recipe only has ingredients list, add the same list to both normal and expensive recipe type
+                    if (r.jsonIngredients != null) {
+                        var tmpRecipe = new DifficultyRecipe();
+                        tmpRecipe.jsonIngredients = r.jsonIngredients;
+                        convertJsonIngredients(ref tmpRecipe);
 
-                    state.DoString("ingredientsCount = #data[" + i + "][\"ingredients\"]");
-                    int ingredientsCount = (int)(double)state["ingredientsCount"];
-
-                    state.DoString("result = data[" + i + "][\"result\"]");
-                    string recipeResult = (string)state["result"];
-
-                    state.DoString("resultCount = data[" + i + "][\"result_count\"]");
-                    state.DoString("if resultCount == nil then\n   resultCount = 1\nend");
-                    int resultCount = (int)(double)state["resultCount"];
-
-                    for (int j = 1; j < ingredientsCount; j++) {
-                        state.DoString("ingredientName = data[" + i + "][\"ingredients\"][" + j + "][1]");
-                        state.DoString("ingredientCount = data[" + i + "][\"ingredients\"][" + j + "][2]");
-                        state.DoString("ingredientType = data[" + i + "][\"ingredients\"][" + j + "][\"type\"]");
-
-                        string ingredientName = (string)state["ingredientName"];
-                        string ingredientType = (string)state["ingredientType"];
-                        if (ingredientType != "fluid" && ingredientType != "item") {
-                            int ingredientCount = (int)(double)state["ingredientCount"];
-                            recipeIngredients.Add(new RecipeIngredient(ingredientName, ingredientCount));
+                        //If singular result, add it to results list
+                        if (r.result != null) {
+                            tmpRecipe.results = new List<RecipeIngredient> {
+                                new RecipeIngredient(r.result, (int)r.resultCount)
+                            };
                         }
-                    }
-                    Recipes.Add(new Recipe(recipeName, recipeResult, resultCount, recipeIngredients));
-                } else {
-                    List<RecipeIngredient> recipeIngredients = new List<RecipeIngredient>();
-                    List<RecipeIngredient> recipeExpensiveIngredients = new List<RecipeIngredient>();
 
-                    state.DoString("ingredientsCount = #data[" + i + "][\"normal\"][\"ingredients\"]");
-                    int ingredientsCount = (int)(double)state["ingredientsCount"];
+                        //If results exist outside of normal, add it to results
+                        if (r.jsonResults != null) {
+                            tmpRecipe.results ??= new List<RecipeIngredient>();
 
-                    state.DoString("result = data[" + i + "][\"normal\"][\"result\"]");
-                    string recipeResult = (string)state["result"];
-
-                    state.DoString("resultCount = data[" + i + "][\"normal\"][\"result_count\"]");
-                    state.DoString("if resultCount == nil then\n   resultCount = 1\nend");
-                    int resultCount = (int)(double)state["resultCount"];
-
-                    for (int j = 1; j < ingredientsCount; j++) {
-                        state.DoString("ingredientName = data[" + i + "][\"normal\"][\"ingredients\"][" + j + "][1]");
-                        state.DoString("ingredientCount = data[" + i + "][\"normal\"][\"ingredients\"][" + j + "][2]");
-                        state.DoString("ingredientType = data[" + i + "][\"normal\"][\"ingredients\"][" + j + "][\"type\"]");
-
-                        string ingredientName = (string)state["ingredientName"];
-                        string ingredientType = (string)state["ingredientType"];
-                        if (ingredientType != "fluid" && ingredientType != "item") {
-                            int ingredientCount = (int)(double)state["ingredientCount"];
-                            recipeIngredients.Add(new RecipeIngredient(ingredientName, ingredientCount));
+                            foreach (var ing in r.jsonResults) {
+                                if (ing.ValueKind == JsonValueKind.Array) {
+                                    tmpRecipe.results.Add(new RecipeIngredient("item", ing[0].GetString() ?? "", ing[1].GetInt32()));
+                                } else {
+                                    RecipeIngredient? ingredient = ing.Deserialize<RecipeIngredient>();
+                                    if (ingredient != null) {
+                                        tmpRecipe.results.Add(ingredient);
+                                    }    
+                                }
+                            }
                         }
+
+                        //Assing both normal and expensive type the same recipe object
+                        r.normal = tmpRecipe;
+                        r.expensive = tmpRecipe;
+
+                        //Remove unecessary copy of ingredients
+                        r.jsonIngredients.Clear();
                     }
 
-                    state.DoString("ingredientsCount = #data[" + i + "][\"expensive\"][\"ingredients\"]");
-                    ingredientsCount = (int)(double)state["ingredientsCount"];
+                    //Check if result count exists in normal and expensive recipes and clean up the ingredients
+                    if (r.normal != null) {
+                        r.normal.resultCount ??= 1;
+                        DifficultyRecipe normalRecipe = r.normal;
+                        convertJsonIngredients(ref normalRecipe);
+                        r.normal = normalRecipe;
 
-                    state.DoString("result = data[" + i + "][\"expensive\"][\"result\"]");
-                    recipeResult = (string)state["result"];
+                        if (r.normal.result != null) {
+                            r.normal.results = new List<RecipeIngredient> {
+                                new RecipeIngredient(r.normal.result, (int)r.resultCount)
+                            };
+                        }
 
-                    state.DoString("resultCount = data[" + i + "][\"expensive\"][\"result_count\"]");
-                    state.DoString("if resultCount == nil then\n   resultCount = 1\nend");
-                    resultCount = (int)(double)state["resultCount"];
+                        if (r.normal.jsonResults != null) {
+                            r.normal.results ??= new List<RecipeIngredient>();
 
-                    for (int j = 1; j < ingredientsCount; j++) {
-                        state.DoString("ingredientName = data[" + i + "][\"expensive\"][\"ingredients\"][" + j + "][1]");
-                        state.DoString("ingredientCount = data[" + i + "][\"expensive\"][\"ingredients\"][" + j + "][2]");
-                        state.DoString("ingredientType = data[" + i + "][\"expensive\"][\"ingredients\"][" + j + "][\"type\"]");
-
-                        string ingredientName = (string)state["ingredientName"];
-                        string ingredientType = (string)state["ingredientType"];
-                        if (ingredientType != "fluid" && ingredientType != "item") {
-                            int ingredientCount = (int)(double)state["ingredientCount"];
-                            recipeIngredients.Add(new RecipeIngredient(ingredientName, ingredientCount));
+                            foreach (var ing in r.normal.jsonResults) {
+                                if (ing.ValueKind == JsonValueKind.Array) {
+                                    r.normal.results.Add(new RecipeIngredient("item", ing[0].GetString() ?? "", ing[1].GetInt32()));
+                                } else {
+                                    RecipeIngredient? ingredient = ing.Deserialize<RecipeIngredient>();
+                                    if (ingredient != null) {
+                                        r.normal.results.Add(ingredient);
+                                    }
+                                }
+                            }
                         }
                     }
 
-                    Recipes.Add(new Recipe(recipeName, recipeResult, resultCount, recipeIngredients, recipeExpensiveIngredients));
+                    if (r.expensive != null) {
+                        r.expensive.resultCount ??= 1;
+                        DifficultyRecipe expensiveRecipe = r.expensive;
+                        convertJsonIngredients(ref expensiveRecipe);
+                        r.expensive = expensiveRecipe;
+
+                        if (r.expensive.result != null) {
+                            r.expensive.results = new List<RecipeIngredient> {
+                                new RecipeIngredient(r.expensive.result, (int)r.resultCount)
+                            };
+                        }
+
+                        if (r.expensive.jsonResults != null) {
+                            r.expensive.results ??= new List<RecipeIngredient>();
+
+                            foreach (var ing in r.expensive.jsonResults) {
+                                if (ing.ValueKind == JsonValueKind.Array) {
+                                    r.expensive.results.Add(new RecipeIngredient("item", ing[0].GetString() ?? "", ing[1].GetInt32()));
+                                } else {
+                                    RecipeIngredient? ingredient = ing.Deserialize<RecipeIngredient>();
+                                    if (ingredient != null) {
+                                        r.expensive.results.Add(ingredient);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (Logger.VerboseLog) {
+                        Logger.LogInfoVerbose("Recipe " + r.name + " restructured", "loadDefaultRecipes");
+                    }
                 }
+            } else {
+                Logger.LogError("No recipes were loaded", "loadDefaultRecipes");
             }
-
-            Trace.WriteLine(Recipes.Count());
         }
     }
 }

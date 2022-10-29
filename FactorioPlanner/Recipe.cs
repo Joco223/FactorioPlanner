@@ -2,67 +2,75 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace FactorioPlanner {
 
     internal class RecipeIngredient {
 
-        public string Type { get; set; }
-        public string Name { get; set; }
+        public string? type { get; set; }
+        public string? name { get; set; }
 
-        public int Amount { get; set; }
+        public int? amount { get; set; }
 
         public RecipeIngredient() {
-            Type = "";
-            Name = "";
-            Amount = 0;
+            type = "";
+            name = "";
+            amount = 0;
         }
 
         public RecipeIngredient(string name, int amount) {
-            Type = "";
-            Name = name;
-            Amount = amount;
+            type = "";
+            this.name = name;
+            this.amount = amount;
         }
 
         public RecipeIngredient(string type, string name, int amount) {
-            Type = type;
-            Name = name;
-            Amount = amount;
+            this.type = type;
+            this.name = name;
+            this.amount = amount;
         }
     };
 
+    internal class DifficultyRecipe {
+        public string? result { get; set; }
+
+
+        [JsonPropertyName("results")]
+        public List<JsonElement>? jsonResults { get; set; }
+        
+        [JsonIgnore]
+        public List<RecipeIngredient>? results { get; set; }
+
+        public int? resultCount { get; set; }
+
+        [JsonIgnore]
+        public List<RecipeIngredient>? ingredients { get; set; }
+
+        [JsonPropertyName("ingredients")]
+        public List<JsonElement>? jsonIngredients { get; set; }
+    };
+
     internal class Recipe {
-        public string Name { get; set; }
-        public string Result { get; set; }
+        public string name { get; set; }
+        public string? result { get; set; }
 
-        public int ResultCount { get; set; }
+        [JsonPropertyName("results")]
+        public List<JsonElement>? jsonResults { get; set; }
 
-        public List<RecipeIngredient> Ingredients { get; set; }
-        public List<RecipeIngredient> ExpensiveIngredients { get; set; }
+        public int? resultCount { get; set; }
+
+        [JsonPropertyName("ingredients")]
+        public List<JsonElement>? jsonIngredients { get; set; }
+        public DifficultyRecipe? normal { get; set; }
+        public DifficultyRecipe? expensive { get; set; }
 
         public Recipe() {
-            Name = "";
-            Result = "";
-            ResultCount = 0;
-            Ingredients = new List<RecipeIngredient>();
-            ExpensiveIngredients = new List<RecipeIngredient>();
-        }
-
-        public Recipe(string name, string result, int resultCount, List<RecipeIngredient> ingredients) {
-            Name = name;
-            Result = result;
-            ResultCount = resultCount;
-            Ingredients = ingredients;
-            ExpensiveIngredients = new List<RecipeIngredient>();
-        }
-
-        public Recipe(string name, string result, int resultCount, List<RecipeIngredient> ingredients, List<RecipeIngredient> expnesiveIngredients) {
-            Name = name;
-            Result = result;
-            ResultCount = resultCount;
-            Ingredients = ingredients;
-            ExpensiveIngredients = expnesiveIngredients;
+            name = "";
+            result = "";
+            resultCount = 0;
         }
     }
 }
